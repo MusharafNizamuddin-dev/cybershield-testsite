@@ -1,9 +1,8 @@
-// CyberShield Guard: drop-in rate limiting for Express (Node 18+, no dependencies).
-// Stays OFF until the owner clicks "Add security / rate limiting" in CyberShield.
 module.exports = function cybershieldGuard({ siteId, guardKey, api }) {
   let cfg = { enabled: false, max: 60, windowSec: 60 };
   let allowed = 0, blocked = 0;
   const hits = new Map();
+  console.log("CyberShield guard starting. siteId set:", !!siteId, "key set:", !!guardKey);
 
   async function sync() {
     const a = allowed, b = blocked;
@@ -13,8 +12,9 @@ module.exports = function cybershieldGuard({ siteId, guardKey, api }) {
         headers: { "Content-Type": "application/json", "x-guard-key": guardKey },
         body: JSON.stringify({ allowed: a, blocked: b })
       });
-      if (r.ok) { cfg = await r.json(); allowed -= a; blocked -= b; }
-    } catch (e) { /* keep last settings; retry next cycle */ }
+      if (r.ok) { cfg = await r.json(); allowed -= a; blocked -= b; console.log("CyberShield guard synced OK"); }
+      else console.log("CyberShield guard sync failed, HTTP status", r.status);
+    } catch (e) { console.log("CyberShield guard error:", e.message); }
   }
   sync();
   setInterval(sync, 15000).unref();
