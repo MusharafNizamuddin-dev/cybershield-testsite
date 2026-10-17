@@ -1,13 +1,24 @@
 // CyberShield Guard: drop-in rate limiting for Express (Node 18+, no dependencies).
 // Stays OFF until the owner clicks "Add security / rate limiting" in CyberShield.
-// Real visitor IP. If the site already uses app.set('trust proxy', ...), Express handles it.
-// If not, behind a proxy like Render every visitor would look like the proxy, so read the
-// last X-Forwarded-For entry (the one added by the nearest proxy, which visitors cannot fake).
+// Real visitor IP.
+// Platforms like Render, Railway and Heroku put their own proxies in front of your site, so the
+// direct connection comes from a private address (10.x, 172.16.x, 192.168.x, 127.x). Only in that
+// case we read the visitor IP from the proxy headers. If the connection comes from a public IP,
+// we use it as is, so nobody can fake their IP with a header.
+const PRIV = /^(10\.|127\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|::1$|f[cd][0-9a-f]{2}:|fe80:)/i;
+const isPriv = (ip) => PRIV.test(String(ip || "").replace(/^::ffff:/i, ""));
 function clientIp(req) {
-  if (req.app && req.app.get && req.app.get("trust proxy")) return req.ip;
-  const x = req.headers["x-forwarded-for"];
-  if (x) { const p = String(x).split(",").map((s) => s.trim()).filter(Boolean); if (p.length) return p[p.length - 1]; }
-  return req.ip;
+  const peer = String((req.socket && req.socket.remoteAddress) || req.ip || "").replace(/^::ffff:/i, "");
+  if (!isPriv(peer)) return (req.app && req.app.get && req.app.get("trust proxy") && req.ip) || peer;
+  const h = req.headers || {};
+  const direct = h["cf-connecting-ip"] || h["true-client-ip"];
+  if (direct) return String(direct).trim();
+  const x = h["x-forwarded-for"];
+  if (x) {
+    const parts = String(x).split(",").map((s) => s.trim()).filter(Boolean);
+    for (let i = parts.length - 1; i >= 0; i--) if (!isPriv(parts[i])) return parts[i];
+  }
+  return peer;
 }
 module.exports = function cybershieldGuard({ siteId, guardKey, api }) {
   let cfg = { enabled: false, max: 60, windowSec: 60 };
