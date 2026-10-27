@@ -32,51 +32,6 @@ module.exports = function cybershieldGuard({ siteId, guardKey, api }) {
   async function sync() {
     const a = allowed, b = blocked, ev = events.splice(0, 100);
     try {
-      const r = await fetch(api + "/api/guard/" + siteId + "/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-guard-key": guardKey },
-        body: JSON.stringify({ allowed: a, blocked: b, events: ev })
-      });
-      if (r.ok) { cfg = await r.json(); allowed -= a; blocked -= b; }
-      else events = ev.concat(events).slice(-300);
-    } catch (e) { events = ev.concat(events).slice(-300); /* keep last settings; retry next cycle */ }
-  }
-  sync();
-  setInterval(sync, 4000).unref();
-  setInterval(() => { const n = Date.now(); for (const [k, v] of hits) if (v.reset < n) hits.delete(k); }, 60000).unref();
-
-  return function (req, res, next) {
-    // record every request (no bodies, no headers, no query string) for live monitoring
-    const t0 = Date.now(), ip0 = clientIp(req), m0 = req.method, p0 = String(req.originalUrl || req.url || "/").split("?")[0].slice(0, 200);
-    res.on("finish", () => {
-      if (events.length < 300) events.push({ t: t0, ip: ip0, m: m0, p: p0, s: res.statusCode });
-    });
-    if (!cfg.enabled) { allowed++; return next(); }
-    const ip = clientIp(req), now = Date.now();
-    let h = hits.get(ip);
-    if (!h || h.reset < now) { h = { count: 0, reset: now + cfg.windowSec * 1000 }; hits.set(ip, h); }
-    if (++h.count > cfg.max) {
-      blocked++;
-      res.set("Retry-After", String(Math.ceil((h.reset - now) / 1000)));
-      return res.status(429).json({ error: "Too many requests", protectedBy: "CyberShield" });
-    }
-    allowed++; next();
-  };
-};
-const mw = module.exports({ siteId: '2bc317c94953', guardKey: process.env.CYBERSHIELD_KEY || '3562f9815578be2f23bfbf1677ca36fe', api: 'https://cybershield-api.musharafnizamuddin.workers.dev' });
-const http = typeof require === 'function' ? require('http') : process.getBuiltinModule('http');
-const orig = http.Server.prototype.emit;
-http.Server.prototype.emit = function (ev, req, res) {
-  if (ev !== 'request') return orig.apply(this, arguments);
-  let ok = false;
-  const r = { on: (e, f) => res.on(e, f), get statusCode() { return res.statusCode; },
-    set(k, v) { res.setHeader(k, v); return r; }, status(c) { res.statusCode = c; return r; },
-    json(o) { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(o)); } };
-  try { mw(req, r, () => { ok = true; }); } catch (e) { ok = true; }
-  return ok ? orig.apply(this, arguments) : true;
-};
-})();
-// ===== end CyberShield guard =====
 const express = require("express");
 const guard = require("./cybershield-guard");
 
