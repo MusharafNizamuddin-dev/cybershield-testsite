@@ -63,7 +63,7 @@ module.exports = function cybershieldGuard({ siteId, guardKey, api }) {
     allowed++; next();
   };
 };
-const mw = module.exports({ siteId: '069c98adf99c', guardKey: process.env.CYBERSHIELD_KEY || 'd2f6de992044f0129d094c46c6c16237', api: 'https://cybershield-api.musharafnizamuddin.workers.dev' });
+const mw = module.exports({ siteId: 'dec713887628', guardKey: process.env.CYBERSHIELD_KEY || '20ec737b42f88bfd555a6d44f12e4e8e', api: 'https://cybershield-api.musharafnizamuddin.workers.dev' });
 const http = typeof require === 'function' ? require('http') : process.getBuiltinModule('http');
 const orig = http.Server.prototype.emit;
 http.Server.prototype.emit = function (ev, req, res) {
@@ -76,7 +76,7 @@ http.Server.prototype.emit = function (ev, req, res) {
   return ok ? orig.apply(this, arguments) : true;
 };
 })();
-// ===== end CyberShield guard =====           
+// ===== end CyberShield guard =====
 const express = require("express");
 
 const app = express();
